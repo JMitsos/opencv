@@ -95,26 +95,32 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <GenerateManifest>false</GenerateManifest>
     <IgnoreImportLibrary>false</IgnoreImportLibrary>
+    <OutDir>$(SolutionDir)WinRT\$(Platform)\$(Configuration)\$(MSBuildProjectName)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <GenerateManifest>false</GenerateManifest>
     <IgnoreImportLibrary>false</IgnoreImportLibrary>
+    <OutDir>$(SolutionDir)WinRT\$(Platform)\$(Configuration)\$(MSBuildProjectName)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <GenerateManifest>false</GenerateManifest>
     <IgnoreImportLibrary>false</IgnoreImportLibrary>
+    <OutDir>$(SolutionDir)WinRT\$(Platform)\$(Configuration)\$(MSBuildProjectName)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
     <GenerateManifest>false</GenerateManifest>
     <IgnoreImportLibrary>false</IgnoreImportLibrary>
+    <OutDir>$(SolutionDir)WinRT\$(Platform)\$(Configuration)\$(MSBuildProjectName)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <GenerateManifest>false</GenerateManifest>
     <IgnoreImportLibrary>false</IgnoreImportLibrary>
+    <OutDir>$(SolutionDir)WinRT\$(Platform)\$(Configuration)\$(MSBuildProjectName)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <GenerateManifest>false</GenerateManifest>
     <IgnoreImportLibrary>false</IgnoreImportLibrary>
+    <OutDir>$(SolutionDir)WinRT\$(Platform)\$(Configuration)\$(MSBuildProjectName)\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -221,8 +227,16 @@
     <ClInclude Include="opencl_kernels.hpp" />
     <ClInclude Include="..\..\..\modules\features2d\src\fast_score.hpp" />
     <ClInclude Include="..\..\..\modules\features2d\src\precomp.hpp" />
+    <ClInclude Include="..\..\..\modules\features2d\src\akaze\AKAZEConfig.h" />
+    <ClInclude Include="..\..\..\modules\features2d\src\akaze\AKAZEFeatures.h" />
+    <ClInclude Include="..\..\..\modules\features2d\src\kaze\fed.h" />
+    <ClInclude Include="..\..\..\modules\features2d\src\kaze\KAZEConfig.h" />
+    <ClInclude Include="..\..\..\modules\features2d\src\kaze\KAZEFeatures.h" />
+    <ClInclude Include="..\..\..\modules\features2d\src\kaze\nldiffusion_functions.h" />
     <ClInclude Include="..\..\cvconfig.h" />
     <ClInclude Include="..\..\opencv2\opencv_modules.hpp" />
+    <ClCompile Include="..\..\..\modules\features2d\src\akaze\AKAZEFeatures.cpp" />
+    <ClCompile Include="..\..\..\modules\features2d\src\akaze.cpp" />
     <ClCompile Include="..\..\..\modules\features2d\src\bagofwords.cpp" />
     <ClCompile Include="..\..\..\modules\features2d\src\blobdetector.cpp" />
     <ClCompile Include="..\..\..\modules\features2d\src\brief.cpp" />
@@ -236,6 +250,10 @@
     <ClCompile Include="..\..\..\modules\features2d\src\fast_score.cpp" />
     <ClCompile Include="..\..\..\modules\features2d\src\features2d_init.cpp" />
     <ClCompile Include="..\..\..\modules\features2d\src\freak.cpp" />
+    <ClCompile Include="..\..\..\modules\features2d\src\kaze\fed.cpp" />
+    <ClCompile Include="..\..\..\modules\features2d\src\kaze\KAZEFeatures.cpp" />
+    <ClCompile Include="..\..\..\modules\features2d\src\kaze\nldiffusion_functions.cpp" />
+    <ClCompile Include="..\..\..\modules\features2d\src\kaze.cpp" />
     <ClCompile Include="..\..\..\modules\features2d\src\keypoint.cpp" />
     <ClCompile Include="..\..\..\modules\features2d\src\matchers.cpp" />
     <ClCompile Include="..\..\..\modules\features2d\src\mser.cpp" />

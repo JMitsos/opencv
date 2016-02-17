@@ -13,6 +13,9 @@
     <ClCompile Include="..\..\..\modules\video\src\bgfg_gmg.cpp">
       <Filter>Src</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\modules\video\src\bgfg_KNN.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\modules\video\src\camshift.cpp">
       <Filter>Src</Filter>
     </ClCompile>
