@@ -820,9 +820,9 @@ CV_IMPL void cvProjectPoints2( const CvMat* objectPoints,
                         {
                             dpdk_p[5] = fx*x*cdist*(-icdist2)*icdist2*r2;
                             dpdk_p[dpdk_step+5] = fy*y*cdist*(-icdist2)*icdist2*r2;
-                            dpdk_p[6] = fx*x*icdist2*cdist*(-icdist2)*icdist2*r4;
+                            dpdk_p[6] = fx*x*cdist*(-icdist2)*icdist2*r4;
                             dpdk_p[dpdk_step+6] = fy*y*cdist*(-icdist2)*icdist2*r4;
-                            dpdk_p[7] = fx*x*icdist2*cdist*(-icdist2)*icdist2*r6;
+                            dpdk_p[7] = fx*x*cdist*(-icdist2)*icdist2*r6;
                             dpdk_p[dpdk_step+7] = fy*y*cdist*(-icdist2)*icdist2*r6;
                             if( _dpdk->cols > 8 )
                             {
@@ -1595,7 +1595,10 @@ void cvCalibrationMatrixValues( const CvMat *calibMatr, CvSize imgSize,
         my = imgHeight / apertureHeight;
     } else {
         mx = 1.0;
-        my = *pasp;
+        if(pasp)
+            my = *pasp;
+        else
+            my = 1.0;
     }
 
     /* Calculate fovx and fovy. */
@@ -2191,7 +2194,7 @@ void cvStereoRectify( const CvMat* _cameraMatrix1, const CvMat* _cameraMatrix2,
     for( k = 0; k < 2; k++ ) {
         const CvMat* A = k == 0 ? _cameraMatrix1 : _cameraMatrix2;
         const CvMat* Dk = k == 0 ? _distCoeffs1 : _distCoeffs2;
-        double dk1 = Dk ? cvmGet(Dk, 0, 0) : 0;
+        double dk1 = Dk && Dk->data.ptr ? cvmGet(Dk, 0, 0) : 0;
         double fc = cvmGet(A,idx^1,idx^1);
         if( dk1 < 0 ) {
             fc *= 1 + dk1*(nx*nx + ny*ny)/(4*fc*fc);
@@ -2972,7 +2975,13 @@ static void collectCalibrationData( InputArrayOfArrays objectPoints,
     for( i = 0; i < nimages; i++ )
     {
         ni = objectPoints.getMat(i).checkVector(3, CV_32F);
-        CV_Assert( ni >= 0 );
+        if( ni <= 0 )
+            CV_Error(CV_StsUnsupportedFormat, "objectPoints should contain vector of vectors of points of type Point3f");
+        int ni1 = imagePoints1.getMat(i).checkVector(2, CV_32F);
+        if( ni1 <= 0 )
+            CV_Error(CV_StsUnsupportedFormat, "imagePoints1 should contain vector of vectors of points of type Point2f");
+        CV_Assert( ni == ni1 );
+
         total += ni;
     }
 
@@ -2995,18 +3004,16 @@ static void collectCalibrationData( InputArrayOfArrays objectPoints,
         Mat objpt = objectPoints.getMat(i);
         Mat imgpt1 = imagePoints1.getMat(i);
         ni = objpt.checkVector(3, CV_32F);
-        int ni1 = imgpt1.checkVector(2, CV_32F);
-        CV_Assert( ni > 0 && ni == ni1 );
         npoints.at<int>(i) = ni;
-        memcpy( objPtData + j, objpt.data, ni*sizeof(objPtData[0]) );
-        memcpy( imgPtData1 + j, imgpt1.data, ni*sizeof(imgPtData1[0]) );
+        memcpy( objPtData + j, objpt.ptr(), ni*sizeof(objPtData[0]) );
+        memcpy( imgPtData1 + j, imgpt1.ptr(), ni*sizeof(imgPtData1[0]) );
 
         if( imgPtData2 )
         {
             Mat imgpt2 = imagePoints2.getMat(i);
             int ni2 = imgpt2.checkVector(2, CV_32F);
             CV_Assert( ni == ni2 );
-            memcpy( imgPtData2 + j, imgpt2.data, ni*sizeof(imgPtData2[0]) );
+            memcpy( imgPtData2 + j, imgpt2.ptr(), ni*sizeof(imgPtData2[0]) );
         }
     }
 }
@@ -3245,13 +3252,13 @@ double cv::calibrateCamera( InputArrayOfArrays _objectPoints,
         {
             _rvecs.create(3, 1, CV_64F, i, true);
             Mat rv = _rvecs.getMat(i);
-            memcpy(rv.data, rvecM.ptr<double>(i), 3*sizeof(double));
+            memcpy(rv.ptr(), rvecM.ptr<double>(i), 3*sizeof(double));
         }
         if( tvecs_needed )
         {
             _tvecs.create(3, 1, CV_64F, i, true);
             Mat tv = _tvecs.getMat(i);
-            memcpy(tv.data, tvecM.ptr<double>(i), 3*sizeof(double));
+            memcpy(tv.ptr(), tvecM.ptr<double>(i), 3*sizeof(double));
         }
     }
     cameraMatrix.copyTo(_cameraMatrix);
@@ -3365,7 +3372,9 @@ void cv::stereoRectify( InputArray _cameraMatrix1, InputArray _distCoeffs1,
         p_Q = &(c_Q = _Qmat.getMat());
     }
 
-    cvStereoRectify( &c_cameraMatrix1, &c_cameraMatrix2, &c_distCoeffs1, &c_distCoeffs2,
+    CvMat *p_distCoeffs1 = distCoeffs1.empty() ? NULL : &c_distCoeffs1;
+    CvMat *p_distCoeffs2 = distCoeffs2.empty() ? NULL : &c_distCoeffs2;
+    cvStereoRectify( &c_cameraMatrix1, &c_cameraMatrix2, p_distCoeffs1, p_distCoeffs2,
         imageSize, &c_R, &c_T, &c_R1, &c_R2, &c_P1, &c_P2, p_Q, flags, alpha,
         newImageSize, (CvRect*)validPixROI1, (CvRect*)validPixROI2);
 }
@@ -3472,7 +3481,7 @@ void cv::decomposeProjectionMatrix( InputArray _projMatrix, OutputArray _cameraM
     if( _eulerAngles.needed() )
     {
         _eulerAngles.create(3, 1, CV_64F, -1, true);
-        p_eulerAngles = (CvPoint3D64f*)_eulerAngles.getMat().data;
+        p_eulerAngles = _eulerAngles.getMat().ptr<CvPoint3D64f>();
     }
 
     cvDecomposeProjectionMatrix(&c_projMatrix, &c_cameraMatrix, &c_rotMatrix,

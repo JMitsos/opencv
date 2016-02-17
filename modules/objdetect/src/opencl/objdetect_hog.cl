@@ -48,7 +48,15 @@
 #define CELLS_PER_BLOCK_X 2
 #define CELLS_PER_BLOCK_Y 2
 #define NTHREADS 256
-#define CV_PI_F 3.1415926535897932384626433832795f
+#define CV_PI_F M_PI_F
+
+#ifdef INTEL_DEVICE
+#define QANGLE_TYPE     int
+#define QANGLE_TYPE2    int2
+#else
+#define QANGLE_TYPE     uchar
+#define QANGLE_TYPE2    uchar2
+#endif
 
 //----------------------------------------------------------------------------
 // Histogram computation
@@ -59,7 +67,7 @@ __kernel void compute_hists_lut_kernel(
     const int cnbins, const int cblock_hist_size, const int img_block_width,
     const int blocks_in_group, const int blocks_total,
     const int grad_quadstep, const int qangle_step,
-    __global const float* grad, __global const uchar* qangle,
+    __global const float* grad, __global const QANGLE_TYPE* qangle,
     __global const float* gauss_w_lut,
     __global float* block_hists, __local float* smem)
 {
@@ -86,7 +94,7 @@ __kernel void compute_hists_lut_kernel(
 
     __global const float* grad_ptr = (gid < blocks_total) ?
         grad + offset_y * grad_quadstep + (offset_x << 1) : grad;
-    __global const uchar* qangle_ptr = (gid < blocks_total) ?
+    __global const QANGLE_TYPE* qangle_ptr = (gid < blocks_total) ?
         qangle + offset_y * qangle_step + (offset_x << 1) : qangle;
 
     __local float* hist = hists + 12 * (cell_y * CELLS_PER_BLOCK_Y + cell_x) +
@@ -101,7 +109,7 @@ __kernel void compute_hists_lut_kernel(
     for (int dist_y = dist_y_begin; dist_y < dist_y_begin + 12; ++dist_y)
     {
         float2 vote = (float2) (grad_ptr[0], grad_ptr[1]);
-        uchar2 bin = (uchar2) (qangle_ptr[0], qangle_ptr[1]);
+        QANGLE_TYPE2 bin = (QANGLE_TYPE2) (qangle_ptr[0], qangle_ptr[1]);
 
         grad_ptr += grad_quadstep;
         qangle_ptr += qangle_step;
@@ -133,9 +141,8 @@ __kernel void compute_hists_lut_kernel(
             final_hist[(cell_x * 2 + cell_y) * cnbins + bin_id] =
                 hist_[0] + hist_[1] + hist_[2];
     }
-#ifdef CPU
+
     barrier(CLK_LOCAL_MEM_FENCE);
-#endif
 
     int tid = (cell_y * CELLS_PER_BLOCK_Y + cell_x) * 12 + cell_thread_x;
     if ((tid < cblock_hist_size) && (gid < blocks_total))
@@ -558,7 +565,7 @@ __kernel void extract_descrs_by_cols_kernel(
 __kernel void compute_gradients_8UC4_kernel(
     const int height, const int width,
     const int img_step, const int grad_quadstep, const int qangle_step,
-    const __global uchar4 * img, __global float * grad, __global uchar * qangle,
+    const __global uchar4 * img, __global float * grad, __global QANGLE_TYPE * qangle,
     const float angle_scale, const char correct_gamma, const int cnbins)
 {
     const int x = get_global_id(0);
@@ -599,23 +606,23 @@ __kernel void compute_gradients_8UC4_kernel(
     barrier(CLK_LOCAL_MEM_FENCE);
     if (x < width)
     {
-        float3 a = (float3) (sh_row[tid], sh_row[tid + (NTHREADS + 2)],
-            sh_row[tid + 2 * (NTHREADS + 2)]);
-        float3 b = (float3) (sh_row[tid + 2], sh_row[tid + 2 + (NTHREADS + 2)],
-            sh_row[tid + 2 + 2 * (NTHREADS + 2)]);
+        float4 a = (float4) (sh_row[tid], sh_row[tid + (NTHREADS + 2)],
+            sh_row[tid + 2 * (NTHREADS + 2)], 0);
+        float4 b = (float4) (sh_row[tid + 2], sh_row[tid + 2 + (NTHREADS + 2)],
+            sh_row[tid + 2 + 2 * (NTHREADS + 2)], 0);
 
-        float3 dx;
+        float4 dx;
         if (correct_gamma == 1)
             dx = sqrt(b) - sqrt(a);
         else
             dx = b - a;
 
-        float3 dy = (float3) 0.f;
+        float4 dy = (float4) 0.f;
 
         if (gidY > 0 && gidY < height - 1)
         {
-            a = convert_float3(img[(gidY - 1) * img_step + x].xyz);
-            b = convert_float3(img[(gidY + 1) * img_step + x].xyz);
+            a = convert_float4(img[(gidY - 1) * img_step + x].xyzw);
+            b = convert_float4(img[(gidY + 1) * img_step + x].xyzw);
 
             if (correct_gamma == 1)
                 dy = sqrt(b) - sqrt(a);
@@ -623,27 +630,24 @@ __kernel void compute_gradients_8UC4_kernel(
                 dy = b - a;
         }
 
+        float4 mag = hypot(dx, dy);
         float best_dx = dx.x;
         float best_dy = dy.x;
 
-        float mag0 = dx.x * dx.x + dy.x * dy.x;
-        float mag1 = dx.y * dx.y + dy.y * dy.y;
-        if (mag0 < mag1)
+        float mag0 = mag.x;
+        if (mag0 < mag.y)
         {
             best_dx = dx.y;
             best_dy = dy.y;
-            mag0 = mag1;
+            mag0 = mag.y;
         }
 
-        mag1 = dx.z * dx.z + dy.z * dy.z;
-        if (mag0 < mag1)
+        if (mag0 < mag.z)
         {
             best_dx = dx.z;
             best_dy = dy.z;
-            mag0 = mag1;
+            mag0 = mag.z;
         }
-
-        mag0 = sqrt(mag0);
 
         float ang = (atan2(best_dy, best_dx) + CV_PI_F) * angle_scale - 0.5f;
         int hidx = (int)floor(ang);
@@ -660,7 +664,7 @@ __kernel void compute_gradients_8UC4_kernel(
 __kernel void compute_gradients_8UC1_kernel(
     const int height, const int width,
     const int img_step, const int grad_quadstep, const int qangle_step,
-    __global const uchar * img, __global float * grad, __global uchar * qangle,
+    __global const uchar * img, __global float * grad, __global QANGLE_TYPE * qangle,
     const float angle_scale, const char correct_gamma, const int cnbins)
 {
     const int x = get_global_id(0);
@@ -703,7 +707,7 @@ __kernel void compute_gradients_8UC1_kernel(
             else
                 dy = a - b;
         }
-        float mag = sqrt(dx * dx + dy * dy);
+        float mag = hypot(dx, dy);
 
         float ang = (atan2(dy, dx) + CV_PI_F) * angle_scale - 0.5f;
         int hidx = (int)floor(ang);

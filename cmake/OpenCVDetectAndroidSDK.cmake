@@ -180,7 +180,7 @@ unset(__android_project_chain CACHE)
 # add_android_project(target_name ${path} NATIVE_DEPS opencv_core LIBRARY_DEPS ${OpenCV_BINARY_DIR} SDK_TARGET 11)
 macro(add_android_project target path)
   # parse arguments
-  set(android_proj_arglist NATIVE_DEPS LIBRARY_DEPS SDK_TARGET IGNORE_JAVA IGNORE_MANIFEST)
+  set(android_proj_arglist NATIVE_DEPS LIBRARY_DEPS SDK_TARGET IGNORE_JAVA IGNORE_MANIFEST COPY_LIBS)
   set(__varname "android_proj_")
   foreach(v ${android_proj_arglist})
     set(${__varname}${v} "")
@@ -280,9 +280,6 @@ macro(add_android_project target path)
       string(REGEX REPLACE "LOCAL_MODULE[ ]*:=[ ]*([a-zA-Z_][a-zA-Z_0-9]*)[ ]*" "\\1" JNI_LIB_NAME "${JNI_LIB_NAME}")
 
       if(JNI_LIB_NAME)
-        ocv_include_modules_recurse(${android_proj_NATIVE_DEPS})
-        ocv_include_directories("${path}/jni")
-
         if(NATIVE_APP_GLUE)
           include_directories(${ANDROID_NDK}/sources/android/native_app_glue)
           list(APPEND android_proj_jni_files ${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c)
@@ -291,7 +288,9 @@ macro(add_android_project target path)
         endif()
 
         add_library(${JNI_LIB_NAME} MODULE ${android_proj_jni_files})
-        target_link_libraries(${JNI_LIB_NAME} ${OPENCV_LINKER_LIBS} ${android_proj_NATIVE_DEPS})
+        ocv_target_include_modules_recurse(${JNI_LIB_NAME} ${android_proj_NATIVE_DEPS})
+        ocv_target_include_directories(${JNI_LIB_NAME} "${path}/jni")
+        ocv_target_link_libraries(${JNI_LIB_NAME} ${OPENCV_LINKER_LIBS} ${android_proj_NATIVE_DEPS})
 
         set_target_properties(${JNI_LIB_NAME} PROPERTIES
             OUTPUT_NAME "${JNI_LIB_NAME}"
@@ -333,6 +332,19 @@ macro(add_android_project target path)
     endif()
     if(android_proj_native_deps)
       add_dependencies(${target} ${android_proj_native_deps})
+    endif()
+
+    if (android_proj_COPY_LIBS OR ANDROID_EXAMPLES_WITH_LIBS)
+      message(STATUS "Android project with libs: " ${target})
+      add_custom_target(
+        ${target}_copy_libs
+        COMMAND ${CMAKE_COMMAND} -DSRC_DIR=${OpenCV_BINARY_DIR}/lib -DDST_DIR=${android_proj_bin_dir}/libs -P ${OpenCV_SOURCE_DIR}/cmake/copyAndroidLibs.cmake
+        WORKING_DIRECTORY ${OpenCV_BINARY_DIR}/lib
+      )
+      add_dependencies(${target} ${target}_copy_libs)
+      if (ANDROID_EXAMPLES_WITH_LIBS)
+        add_dependencies(${target}_copy_libs "${OpenCV_BINARY_DIR}/bin/classes.jar.dephelper" opencv_java)
+      endif()
     endif()
 
     if(__android_project_chain)

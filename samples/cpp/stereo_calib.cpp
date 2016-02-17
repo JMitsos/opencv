@@ -23,6 +23,7 @@
    ************************************************** */
 
 #include "opencv2/calib3d/calib3d.hpp"
+#include "opencv2/imgcodecs.hpp"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 
@@ -158,7 +159,7 @@ StereoCalib(const vector<string>& imagelist, Size boardSize, bool useCalibrated=
     {
         for( j = 0; j < boardSize.height; j++ )
             for( k = 0; k < boardSize.width; k++ )
-                objectPoints[i].push_back(Point3f(j*squareSize, k*squareSize, 0));
+                objectPoints[i].push_back(Point3f(k*squareSize, j*squareSize, 0));
     }
 
     cout << "Running stereo calibration ...\n";
@@ -211,7 +212,7 @@ StereoCalib(const vector<string>& imagelist, Size boardSize, bool useCalibrated=
     cout << "average reprojection err = " <<  err/npoints << endl;
 
     // save intrinsic parameters
-    FileStorage fs("intrinsics.yml", FileStorage::WRITE);
+    FileStorage fs("../data/intrinsics.yml", FileStorage::WRITE);
     if( fs.isOpened() )
     {
         fs << "M1" << cameraMatrix[0] << "D1" << distCoeffs[0] <<
@@ -236,7 +237,7 @@ StereoCalib(const vector<string>& imagelist, Size boardSize, bool useCalibrated=
         fs.release();
     }
     else
-        cout << "Error: can not save the intrinsic parameters\n";
+        cout << "Error: can not save the extrinsic parameters\n";
 
     // OpenCV can handle left-right
     // or up-down camera arrangements
@@ -381,7 +382,7 @@ int main(int argc, char** argv)
 
     if( imagelistfn == "" )
     {
-        imagelistfn = "stereo_calib.xml";
+        imagelistfn = "../data/stereo_calib.xml";
         boardSize = Size(9, 6);
     }
     else if( boardSize.width <= 0 || boardSize.height <= 0 )
